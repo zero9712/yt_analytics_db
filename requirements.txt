@@ -1,0 +1,7 @@
+google-auth>=2.29.0
+google-auth-oauthlib>=1.2.0
+google-api-python-client>=2.126.0
+notion-client>=2.2.1
+python-dateutil>=2.9.0
+pytz>=2024.1
+python-dotenv>=1.0.1
