@@ -20,15 +20,15 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-          cache: pip
 
       - name: Install dependencies
         run: |
-          pip install \
+          pip install --upgrade pip
+          pip install --upgrade \
             "google-auth>=2.29.0" \
             "google-auth-oauthlib>=1.2.0" \
             "google-api-python-client>=2.126.0" \
-            "notion-client>=2.2.1" \
+            "notion-client==2.2.1" \
             "python-dateutil>=2.9.0" \
             "pytz>=2024.1" \
             "python-dotenv>=1.0.1"
@@ -48,6 +48,9 @@ jobs:
           echo "NOTION_TOKEN=${NOTION_TOKEN}"                   > .env
           echo "GOOGLE_CLIENT_SECRET_PATH=client_secret.json" >> .env
           echo "GOOGLE_TOKEN_PATH=token.json"                  >> .env
+
+      - name: Verify notion-client version
+        run: pip show notion-client
 
       - name: Run sync
         run: python yt_notion_sync.py
