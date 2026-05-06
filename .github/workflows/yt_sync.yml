@@ -1,31 +1,24 @@
 # .github/workflows/yt_sync.yml
 # ─────────────────────────────────────────────────────────────────────────────
-#  Runs yt_notion_sync.py every Monday at 09:00 KST (00:00 UTC).
-#  This is early enough that the previous month's YouTube Analytics data is
-#  fully settled (YouTube closes monthly data ~2–3 days after month end).
+#  Runs yt_notion_sync.py on the 1st of every month at 09:00 KST (00:00 UTC).
 #
-#  REQUIRED SECRETS  (Settings → Secrets and variables → Actions → New secret)
-#  ┌──────────────────────────────┬──────────────────────────────────────────┐
-#  │ Secret name                  │ Value                                    │
-#  ├──────────────────────────────┼──────────────────────────────────────────┤
-#  │ NOTION_TOKEN                 │ secret_XXXX…  (Notion integration token) │
-#  │ GOOGLE_CLIENT_SECRET_JSON    │ Full contents of client_secret.json      │
-#  │ GOOGLE_TOKEN_JSON            │ Full contents of token.json              │
-#  │                              │  (generate once locally, then paste)     │
-#  └──────────────────────────────┴──────────────────────────────────────────┘
+#  REQUIRED SECRETS  (Settings → Secrets and variables → Actions)
+#  NOTION_TOKEN            → Notion integration token
+#  GOOGLE_CLIENT_SECRET_JSON → Full contents of client_secret.json
+#  GOOGLE_TOKEN_JSON         → Full contents of token.json
+#                              (generate once locally, then paste here)
 #
-#  TOKEN REFRESH NOTE:
-#  token.json is written back to the GOOGLE_TOKEN_JSON secret after each run
-#  so the refresh token stays current automatically.
+#  NOTE: If your Google OAuth token ever expires, re-run the script locally
+#  once to refresh token.json, then update GOOGLE_TOKEN_JSON secret manually.
 # ─────────────────────────────────────────────────────────────────────────────
 
 name: YouTube → Notion Sync
 
 on:
   schedule:
-    # Every Monday 00:00 UTC  =  09:00 KST
-    - cron: "0 0 * * 1"
-  workflow_dispatch:   # ← allows manual "Run workflow" from the Actions tab
+    # 1st of every month 00:00 UTC = 09:00 KST
+    - cron: "0 0 1 * *"
+  workflow_dispatch:
 
 jobs:
   sync:
@@ -34,18 +27,15 @@ jobs:
     timeout-minutes: 30
 
     steps:
-      # ── 1. Checkout ──────────────────────────────────────────────────────
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # ── 2. Python ────────────────────────────────────────────────────────
       - name: Set up Python 3.12
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
           cache: pip
 
-      # ── 3. Dependencies ───────────────────────────────────────────────────
       - name: Install dependencies
         run: |
           pip install \
@@ -57,7 +47,6 @@ jobs:
             pytz \
             python-dotenv
 
-      # ── 4. Write credential files from secrets ────────────────────────────
       - name: Write Google credential files
         env:
           CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET_JSON }}
@@ -66,29 +55,13 @@ jobs:
           echo "$CLIENT_SECRET" > client_secret.json
           echo "$TOKEN"         > token.json
 
-      # ── 5. Write .env ──────────────────────────────────────────────────────
       - name: Write .env
         env:
           NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
         run: |
-          echo "NOTION_TOKEN=${NOTION_TOKEN}"                      > .env
-          echo "GOOGLE_CLIENT_SECRET_PATH=client_secret.json"     >> .env
-          echo "GOOGLE_TOKEN_PATH=token.json"                      >> .env
+          echo "NOTION_TOKEN=${NOTION_TOKEN}"                   > .env
+          echo "GOOGLE_CLIENT_SECRET_PATH=client_secret.json" >> .env
+          echo "GOOGLE_TOKEN_PATH=token.json"                  >> .env
 
-      # ── 6. Run sync ────────────────────────────────────────────────────────
       - name: Run sync
         run: python yt_notion_sync.py
-
-      # ── 7. Persist refreshed token back to secrets ─────────────────────────
-      #  This step updates the GOOGLE_TOKEN_JSON secret so the next run
-      #  can reuse the refreshed access/refresh tokens.
-      - name: Update GOOGLE_TOKEN_JSON secret
-        if: always()
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          REPO:     ${{ github.repository }}
-        run: |
-          TOKEN_CONTENT=$(cat token.json)
-          gh secret set GOOGLE_TOKEN_JSON \
-            --repo "$REPO" \
-            --body "$TOKEN_CONTENT"
